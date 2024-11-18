@@ -1,7 +1,3 @@
 .env
-adam.m4a
-agnieszka.m4a
-ardian.m4a
-michal.m4a
-monika.m4a
-rafal.m4a
+*.txt
+*.m4a
