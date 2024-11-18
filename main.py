@@ -1,6 +1,7 @@
 import os
 from groq import Groq
 from dotenv import load_dotenv
+from openai import OpenAI
 
 load_dotenv()
 GROQ_API_KEY = os.getenv('GROQ_API_KEY')
@@ -38,15 +39,25 @@ Here are the transcripts to analyze:
     prompt += """
 Now, let's think about this carefully:
 
-1. First, let's identify all mentions of locations, buildings, or directions in the testimonies.
-2. Let's analyze which testimonies seem more reliable and why.
-3. Let's look for any patterns or corroborating details between different testimonies.
-4. We need to find not just any location, but specifically the street where the institute is located.
-5. Remember that some testimonies might be contradictory or misleading.
+1. Extract every detail about the professor's daily routine and movement patterns
+2. Pay special attention to descriptions of the institute's surroundings
+3. Note any mentions of public transport routes or landmarks near the institute
+4. Focus on consistent details that appear in multiple testimonies
+5. Look for specific academic departments or fields of study mentioned
+6. Use your knowledge to match these details with real locations
+
+
 
 Based on this analysis, please provide the exact street name where Professor Maj's specific institute is located.
 
-Think carefully and show your reasoning before providing the final answer."""
+Think carefully and show your reasoning before providing the final answer.
+
+Provide your final answer in the following JSON format:
+{
+    "thinking": "Your detailed step-by-step analysis and reasoning process",
+    "answer": "The exact street name where the institute is located (ONLY STREET NAME)"
+}
+"""
 
     return prompt
 
@@ -64,6 +75,24 @@ def load_transcripts():
             })
     
     return transcripts
+
+OPENAI_API_KEY = os.getenv('OPENAI_API_KEY')
+
+def send_to_openai(prompt):
+    client = OpenAI(api_key=OPENAI_API_KEY)
+
+    try:
+        response = client.chat.completions.create(
+            model="gpt-4",
+            messages=[{"role":"user", "content":prompt}],
+            temperature=0.5
+        )
+
+        return response.choices[0].message.content
+    
+    except Exception as e:
+        print(f"Error during OpenAi API call: {str(e)}")
+        return None
 
 def main():
     # audio_files = find_audio_files()
@@ -95,7 +124,19 @@ def main():
         
     prompt = prepare_prompt(transcripts)
     print("\nPrepared prompt for analysis:")
-    print(prompt) # Preview first 200 characters
+    print(prompt)
+
+    print("\nSending to OpenAI...")
+    
+    analysis = send_to_openai(prompt)
+    
+    if analysis:
+        print("\nAnalysis result:")
+        print(analysis)
+        
+        with open('analysis_result.txt', 'w', encoding='utf-8') as f:
+            f.write(analysis)
+            print("\nSaved analysis to analysis_result.txt")
     
     return prompt
 
