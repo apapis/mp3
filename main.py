@@ -2,6 +2,8 @@ import os
 from groq import Groq
 from dotenv import load_dotenv
 from openai import OpenAI
+import requests
+import json
 
 load_dotenv()
 GROQ_API_KEY = os.getenv('GROQ_API_KEY')
@@ -94,26 +96,51 @@ def send_to_openai(prompt):
         print(f"Error during OpenAi API call: {str(e)}")
         return None
 
-def main():
-    # audio_files = find_audio_files()
+def send_answer(street):
+    report_api_key = os.getenv('REPORT_API_KEY')
+    report_url = os.getenv('REPORT_URL')
     
-    # if not audio_files:
-    #     print("No audio files found!")
-    #     return
-    
-    # print(f"Found {len(audio_files)} audio files:")
-    # for file in audio_files:
-    #     print(f"- {file}")
-    
-    # for file in audio_files:
-    #     print(f"\nProcessing: {file}")
-    #     transcription = transcribe_file(file)
+    pyload = {
+        "task":"mp3",
+        "apikey": report_api_key,
+        "answer": street
+    }
+
+    try:
+        response = requests.post(report_url, json=pyload)
+        result = response.json()
+
+        if result.get('code')==0:
+            print("Success:", result.get('message'))
+            return True
+        else:
+            print("Error:", result.get('message'))
+            return False
         
-    #     if transcription:
-    #         output_file = f"{os.path.splitext(file)[0]}_transcript.txt"
-    #         with open(output_file, 'w', encoding='utf-8') as txt_file:
-    #             txt_file.write(transcription)
-    #         print(f"Saved transcription to: {output_file}")
+    except requests.RequestException as e:
+        print(f"Error sending answer: {e}")
+        return False
+
+def main():
+    audio_files = find_audio_files()
+    
+    if not audio_files:
+        print("No audio files found!")
+        return
+    
+    print(f"Found {len(audio_files)} audio files:")
+    for file in audio_files:
+        print(f"- {file}")
+    
+    for file in audio_files:
+        print(f"\nProcessing: {file}")
+        transcription = transcribe_file(file)
+        
+        if transcription:
+            output_file = f"{os.path.splitext(file)[0]}_transcript.txt"
+            with open(output_file, 'w', encoding='utf-8') as txt_file:
+                txt_file.write(transcription)
+            print(f"Saved transcription to: {output_file}")
 
     print("\nPreparing analysis...")
     transcripts = load_transcripts()
@@ -129,16 +156,32 @@ def main():
     print("\nSending to OpenAI...")
     
     analysis = send_to_openai(prompt)
-    
+
     if analysis:
-        print("\nAnalysis result:")
-        print(analysis)
-        
-        with open('analysis_result.txt', 'w', encoding='utf-8') as f:
-            f.write(analysis)
-            print("\nSaved analysis to analysis_result.txt")
-    
-    return prompt
+        try:
+            # Parse the JSON response
+            result = json.loads(analysis)
+            
+            print("\nAnalysis reasoning:")
+            print(result['thinking'])
+            
+            print("\nFound street:")
+            print(result['answer'])
+            
+            # Send the answer
+            print("\nSending answer to API...")
+            if send_answer(result['answer']):
+                print("Answer submitted successfully!")
+            else:
+                print("Failed to submit answer.")
+            
+            # Save full analysis
+            with open('analysis_result.txt', 'w', encoding='utf-8') as f:
+                f.write(analysis)
+                
+        except json.JSONDecodeError as e:
+            print(f"Error parsing OpenAI response as JSON: {e}")
+            print("Raw response:", analysis)
 
 if __name__ == "__main__":
     main()
